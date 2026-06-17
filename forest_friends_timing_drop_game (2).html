@@ -1,0 +1,412 @@
+<style>
+@keyframes sdgPop{0%{opacity:0;transform:translate(-50%,-40%) scale(.6);}30%{opacity:1;transform:translate(-50%,-50%) scale(1.15);}100%{opacity:0;transform:translate(-50%,-85%) scale(1);}}
+@keyframes sdgPulse{0%{transform:scale(1);}50%{transform:scale(1.2);}100%{transform:scale(1);}}
+@keyframes sdgShake{0%,100%{transform:translateX(0);}25%{transform:translateX(-7px);}75%{transform:translateX(7px);}}
+</style>
+<h2 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">곰, 개구리, 라쿤, 돼지, 돌고래 중 랜덤으로 등장하는 멜빵 캐릭터가 좌우로 움직이다가 점선 위치에 왔을 때 스페이스바나 버튼을 눌러 같은 모양 틀에 떨어뜨리는 타이밍 게임. 8비트 배경음악, 효과음, 저장되는 랭킹 포함</h2>
+<div style="background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:1rem;max-width:440px;margin:0 auto;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:.75rem;">
+    <div style="flex:1;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--color-text-secondary);text-align:center;">
+      <div>점수<br><span id="sdg-score" style="font-size:20px;font-weight:500;color:var(--color-text-primary);">0</span></div>
+      <div>레벨<br><span id="sdg-level" style="font-size:20px;font-weight:500;color:var(--color-text-primary);">1</span></div>
+      <div>콤보<br><span id="sdg-combo" style="font-size:20px;font-weight:500;color:var(--color-text-primary);">0</span></div>
+      <div id="sdg-lives" style="display:flex;gap:4px;align-items:center;"></div>
+    </div>
+    <button id="sdg-mute" style="font-size:12px;padding:6px 10px;white-space:nowrap;">소리 끄기</button>
+  </div>
+  <div id="sdg-stage" tabindex="0" style="position:relative;height:340px;background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);overflow:hidden;cursor:pointer;outline:none;">
+    <div id="sdg-guide" style="position:absolute;top:0;left:40px;width:0;height:216px;border-left:2px dashed var(--color-border-secondary);"></div>
+    <div id="sdg-piece" style="position:absolute;width:80px;height:110px;top:14px;left:0;"></div>
+    <div id="sdg-frame" style="position:absolute;width:80px;height:110px;top:216px;left:0;"></div>
+    <div id="sdg-feedback" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;font-weight:500;pointer-events:none;"></div>
+    <div id="sdg-overlay" style="display:none;position:absolute;inset:0;background:var(--color-background-primary);flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:1rem;">
+      <div style="font-size:18px;font-weight:500;color:var(--color-text-primary);">게임 종료!</div>
+      <div style="font-size:14px;color:var(--color-text-secondary);">최종 점수: <span id="sdg-finalscore" style="font-weight:500;color:var(--color-text-primary);">0</span></div>
+      <div style="width:100%;max-width:220px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.5rem .75rem;">
+        <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px;">랭킹 TOP 5</div>
+        <div id="sdg-leaderboard-list"></div>
+      </div>
+      <button id="sdg-restart">다시 하기</button>
+    </div>
+  </div>
+  <button id="sdg-dropbtn" style="width:100%;margin-top:.75rem;font-size:16px;padding:10px;">지금이야! 떨어뜨리기 (Space)</button>
+  <p id="sdg-hint" style="font-size:13px;color:var(--color-text-tertiary);margin:.5rem 0 0;text-align:center;">1판은 연습! 점선 위치에서 스페이스바나 버튼을 누르세요</p>
+</div>
+<script>
+(function(){
+var BODY_ROWS=[
+".DBBLBBBBBBLBBD.",
+"BDBBLOOOOOOLBBDB",
+".DBBLOOOOOOLBBD.",
+".DBOOOOOOOOOOBD.",
+".DBOOOOYYOOOOBD.",
+".DBOOOOOOOOOOBD.",
+".DBOOOOOOOOOOBD.",
+".DOOOOO..OOOOOD.",
+".DBBBBB..BBBBBD."
+];
+var CHARACTERS=[
+{name:'bear',head:[
+"...DD......DD...",
+"...BB......BB...",
+"..DDDD....DDDD..",
+"..DDDDDDDDDDDD..",
+"..DBBBBBBBBBBD..",
+"..DBBBBBBBBBBD..",
+"..DBBBBBBBBBBD..",
+"..DBBKBBBBKBBD..",
+"..DBBBTKKTBBBD..",
+"..DPBBTTTTBBPD..",
+"..DBBBBBBBBBBD..",
+"...DBBBBBBBBD...",
+"....DBBBBBBD...."
+],colors:{B:'#A6703D',D:'#5C3A21',T:'#E0B080',K:'#231408',P:'#F2A6A6',O:'#3D6EA5',L:'#5C90C9',Y:'#F4C744'}},
+{name:'frog',head:[
+"...DD......DD...",
+"..DBKBD..DBKBD..",
+".DDDDDD..DDDDDD.",
+"..DDDDDDDDDDDD..",
+"..DBBBBBBBBBBD..",
+"..DBBBBBBBBBBD..",
+"..DBBBBBBBBBBD..",
+"..DBBBBKKBBBBD..",
+"..DBBKKKKKKBBD..",
+"..DTTTTTTTTTTD..",
+"..DBBBBBBBBBBD..",
+"...DBBBBBBBBD...",
+"....DBBBBBBD...."
+],colors:{B:'#6FAF4A',D:'#3F6B2A',T:'#A8D87F',K:'#1B2A12',O:'#3D6EA5',L:'#5C90C9',Y:'#F4C744'}},
+{name:'raccoon',head:[
+"...DD......DD...",
+"...BB......BB...",
+"..DDDD....DDDD..",
+"..DDDDDDDDDDDD..",
+"..DBBBBBBBBBBD..",
+"..DBBBBBBBBBBD..",
+"..DMMMBBBBMMMD..",
+"..DMKMBBBBMKMD..",
+"..DBBBTTTTBBBD..",
+"..DPBBTKKTBBPD..",
+"..DBBBBBBBBBBD..",
+"...DBBBBBBBBD...",
+"....DBBBBBBD...."
+],colors:{B:'#8A7E6C',D:'#3A2E22',T:'#E3D8C4',K:'#1A130C',M:'#2B2620',P:'#F2A6A6',O:'#3D6EA5',L:'#5C90C9',Y:'#F4C744'}},
+{name:'pig',head:[
+"...DD......DD...",
+"...BB......BB...",
+"..DDDD....DDDD..",
+"..DDDDDDDDDDDD..",
+"..DBBBBBBBBBBD..",
+"..DBBBBBBBBBBD..",
+"..DBBKBBBBKBBD..",
+"..DBBTTTTTTBBD..",
+"..DBBTKTTKTBBD..",
+"..DPBBTTTTBBPD..",
+"..DBBBBBBBBBBD..",
+"...DBBBBBBBBD...",
+"....DBBBBBBD...."
+],colors:{B:'#F2A8C4',D:'#8C4A63',T:'#FBD0E0',K:'#231408',P:'#FF9EBB',O:'#3D6EA5',L:'#5C90C9',Y:'#F4C744'}},
+{name:'dolphin',head:[
+".......DD.......",
+"......BBBB......",
+"...DDDDDDDDDD...",
+"..DDDDDDDDDDDD..",
+"..DBBBBBBBBBBD..",
+"..DBBBBBBBBBBD..",
+"..DBBBBBBBBBBD..",
+"..DBBKBBBBKBBD..",
+"..DBBBTTTTBBBD..",
+"...DBBTTTTBBD...",
+"....DTTTTTTD....",
+".....DBBBBD.....",
+"......DBBD......"
+],colors:{B:'#8FA9B8',D:'#3E5C6B',T:'#DCEBF0',K:'#16222A',O:'#3D6EA5',L:'#5C90C9',Y:'#F4C744'}}
+];
+function fullRows(ch){return ch.head.concat(BODY_ROWS);}
+function buildPieceSVG(ch){
+var rows=fullRows(ch);
+var rects='';
+for(var r=0;r<rows.length;r++){
+var row=rows[r];
+for(var c=0;c<row.length;c++){
+var key=row[c];
+if(key==='.')continue;
+rects+='<rect x="'+c+'" y="'+r+'" width="1" height="1" fill="'+ch.colors[key]+'"/>';
+}
+}
+return '<svg viewBox="0 0 16 22" width="100%" height="100%" shape-rendering="crispEdges">'+rects+'</svg>';
+}
+function buildFrameSVG(ch){
+var rows=fullRows(ch);
+var rects='';
+for(var r=0;r<rows.length;r++){
+var row=rows[r];
+for(var c=0;c<row.length;c++){
+if(row[c]==='.')continue;
+rects+='<rect x="'+c+'" y="'+r+'" width="1" height="1" fill="#EDE3D0" stroke="#C9B996" stroke-width="0.06"/>';
+}
+}
+rects+='<rect x="0.3" y="0.3" width="15.4" height="21.4" fill="none" stroke="#8B6F47" stroke-width="0.5" stroke-dasharray="1.4 1"/>';
+return '<svg viewBox="0 0 16 22" width="100%" height="100%" shape-rendering="crispEdges">'+rects+'</svg>';
+}
+function heartIcon(filled){
+var color=filled?'#E24B4A':'#9A9A94';
+var op=filled?1:0.35;
+return '<svg width="18" height="18" viewBox="0 0 24 24" style="opacity:'+op+';display:block;"><path d="M12 21s-7.5-4.7-10-9.3C0.5 8.5 2 5 5.5 5c2 0 3.5 1.2 4.5 2.7C11 6.2 12.5 5 14.5 5 18 5 19.5 8.5 18 11.7 19.5 16.3 12 21 12 21z" fill="'+color+'"/></svg>';
+}
+function $(id){return document.getElementById(id);}
+var prevCharIdx=-1;
+function pickCharacter(){
+var idx;
+do{idx=Math.floor(Math.random()*CHARACTERS.length);}while(idx===prevCharIdx&&CHARACTERS.length>1);
+prevCharIdx=idx;
+return CHARACTERS[idx];
+}
+var audioCtx=null,sfxGain=null,bgmGain=null,bgmTimer=null,muted=false;
+var BGM_NOTES={'C4':261.63,'D4':293.66,'E4':329.63,'F4':349.23,'G4':392.00,'A4':440.00,'B4':493.88,'C5':523.25,'D5':587.33,'E5':659.25,'F5':698.46,'G5':783.99,'A5':880.00,'B5':987.77};
+var bgmMelody=[
+{note:'E5',dur:0.2},{note:'G5',dur:0.2},{note:'E5',dur:0.2},{note:'C5',dur:0.2},
+{note:'D5',dur:0.2},{note:'G4',dur:0.4},{note:null,dur:0.2},
+{note:'D5',dur:0.2},{note:'F5',dur:0.2},{note:'D5',dur:0.2},{note:'B4',dur:0.2},
+{note:'C5',dur:0.2},{note:'G4',dur:0.4},{note:null,dur:0.2},
+{note:'E5',dur:0.2},{note:'G5',dur:0.2},{note:'E5',dur:0.2},{note:'C5',dur:0.2},
+{note:'A5',dur:0.3},{note:'A5',dur:0.1},{note:'G5',dur:0.4},
+{note:'F5',dur:0.2},{note:'D5',dur:0.2},{note:'B4',dur:0.2},{note:'G4',dur:0.2},
+{note:'C5',dur:0.4},{note:null,dur:0.4}
+];
+var bgmIndex=0,bgmNextTime=0;
+function playBgmTone(note,dur,t){
+if(!note)return;
+var osc=audioCtx.createOscillator();
+var g=audioCtx.createGain();
+osc.type='square';
+osc.frequency.setValueAtTime(BGM_NOTES[note],t);
+g.gain.setValueAtTime(1,t);
+g.gain.exponentialRampToValueAtTime(0.0001,t+Math.max(dur-0.02,0.01));
+osc.connect(g);g.connect(bgmGain);
+osc.start(t);osc.stop(t+dur);
+}
+function scheduleBgm(){
+if(!audioCtx)return;
+while(bgmNextTime<audioCtx.currentTime+0.1){
+var cur=bgmMelody[bgmIndex];
+playBgmTone(cur.note,cur.dur,bgmNextTime);
+bgmNextTime+=cur.dur;
+bgmIndex=(bgmIndex+1)%bgmMelody.length;
+}
+}
+function startBGM(){
+bgmIndex=0;
+bgmNextTime=audioCtx.currentTime;
+scheduleBgm();
+bgmTimer=setInterval(scheduleBgm,25);
+}
+function playTone(freq,t,dur,type,vol){
+var osc=audioCtx.createOscillator();
+osc.type=type;
+osc.frequency.value=freq;
+var g=audioCtx.createGain();
+g.gain.setValueAtTime(0,t);
+g.gain.linearRampToValueAtTime(vol,t+0.02);
+g.gain.linearRampToValueAtTime(0,t+dur);
+osc.connect(g);g.connect(sfxGain);
+osc.start(t);osc.stop(t+dur+0.02);
+}
+function sfxPerfect(){
+var t=audioCtx.currentTime;
+playTone(220,t,0.12,'triangle',0.3);
+playTone(440,t+0.10,0.22,'triangle',0.3);
+}
+function sfxGood(){
+var t=audioCtx.currentTime;
+playTone(880,t,0.16,'sine',0.25);
+playTone(1320,t+0.06,0.14,'sine',0.18);
+}
+function sfxMiss(){
+var t=audioCtx.currentTime;
+playTone(160,t,0.25,'sawtooth',0.25);
+}
+function ensureAudio(){
+if(!audioCtx){
+try{
+audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+sfxGain=audioCtx.createGain();sfxGain.gain.value=muted?0:0.5;sfxGain.connect(audioCtx.destination);
+bgmGain=audioCtx.createGain();bgmGain.gain.value=muted?0:0.05;bgmGain.connect(audioCtx.destination);
+startBGM();
+}catch(e){}
+}
+if(audioCtx&&audioCtx.state==='suspended'){audioCtx.resume();}
+}
+var leaderboard=[];
+var STORAGE_KEY='sdg-leaderboard-v1';
+function renderLeaderboard(){
+var el=$('sdg-leaderboard-list');
+if(!el)return;
+if(leaderboard.length===0){el.innerHTML='<div style="font-size:12px;color:var(--color-text-tertiary);">아직 기록이 없어요</div>';return;}
+var html='';
+for(var i=0;i<leaderboard.length;i++){
+html+='<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;'+(i<leaderboard.length-1?'border-bottom:0.5px solid var(--color-border-tertiary);':'')+'"><span style="color:var(--color-text-secondary);">'+(i+1)+'위</span><span style="font-weight:500;color:var(--color-text-primary);">'+leaderboard[i].toLocaleString()+'점</span></div>';
+}
+el.innerHTML=html;
+}
+function saveLeaderboard(){
+try{localStorage.setItem(STORAGE_KEY,JSON.stringify(leaderboard));}catch(e){}
+}
+function loadLeaderboard(){
+try{
+var raw=localStorage.getItem(STORAGE_KEY);
+if(raw)leaderboard=JSON.parse(raw);
+}catch(e){}
+}
+function addScoreToLeaderboard(score){
+leaderboard.push(score);
+leaderboard.sort(function(a,b){return b-a;});
+leaderboard=leaderboard.slice(0,5);
+saveLeaderboard();
+renderLeaderboard();
+}
+var BASE_SPEED=0.00035;
+var MAX_SPEED=0.0009;
+var state={score:0,combo:0,level:1,lives:3,pos:0,dir:1,speed:BASE_SPEED,paused:false,targetFraction:0.5,usableWidth:0,lastTime:0,gameOver:false,round:1};
+function measure(){state.usableWidth=$('sdg-stage').clientWidth-80;}
+function positionFrame(){
+var left=state.targetFraction*state.usableWidth;
+$('sdg-frame').style.left=left+'px';
+$('sdg-guide').style.left=(left+40)+'px';
+}
+function updatePiecePos(){$('sdg-piece').style.left=(state.pos*state.usableWidth)+'px';}
+function newRound(){
+var ch=pickCharacter();
+$('sdg-piece').innerHTML=buildPieceSVG(ch);
+$('sdg-frame').innerHTML=buildFrameSVG(ch);
+state.targetFraction=0.08+Math.random()*0.84;
+positionFrame();
+$('sdg-guide').style.display=state.round<=1?'block':'none';
+$('sdg-hint').textContent=state.round<=1?'1판은 연습! 점선 위치에서 스페이스바나 버튼을 누르세요':'친구가 틀과 겹칠 때 스페이스바나 버튼을 누르세요';
+state.pos=state.dir>0?0:1;
+var pieceEl=$('sdg-piece');
+pieceEl.style.transition='none';
+pieceEl.style.top='14px';
+updatePiecePos();
+requestAnimationFrame(function(){pieceEl.style.transition='';});
+state.paused=false;
+}
+function loop(now){
+if(!state.lastTime)state.lastTime=now;
+var dt=now-state.lastTime;
+state.lastTime=now;
+if(!state.paused&&!state.gameOver){
+state.pos+=state.dir*state.speed*dt;
+if(state.pos>=1){state.pos=1;state.dir=-1;}
+if(state.pos<=0){state.pos=0;state.dir=1;}
+updatePiecePos();
+}
+requestAnimationFrame(loop);
+}
+function showFeedback(text,colorVar){
+var el=$('sdg-feedback');
+el.textContent=text;
+el.style.color=colorVar;
+el.style.animation='none';
+void el.offsetWidth;
+el.style.animation='sdgPop .9s ease-out forwards';
+}
+function dropPiece(){
+ensureAudio();
+if(state.paused||state.gameOver)return;
+state.paused=true;
+var capturedPos=state.pos;
+var pieceEl=$('sdg-piece');
+pieceEl.style.transition='top .42s cubic-bezier(.4,0,.6,1)';
+pieceEl.style.top='216px';
+setTimeout(function(){
+var diff=Math.abs(capturedPos-state.targetFraction);
+var tier=diff<=0.045?'perfect':(diff<=0.10?'good':'miss');
+handleResult(tier,pieceEl);
+},440);
+}
+function maybeLevelUp(){
+if(state.combo>0&&state.combo%4===0){
+state.level++;
+if(state.level%3===0){
+state.speed=Math.min(state.speed*1.12,MAX_SPEED);
+}
+}
+}
+function handleResult(tier,pieceEl){
+if(tier==='perfect'){
+state.combo++;
+var gain=100+state.combo*20;
+state.score+=gain;
+showFeedback('완벽해요! +'+gain,'var(--color-text-success)');
+pieceEl.style.animation='sdgPulse .4s ease';
+sfxPerfect();
+maybeLevelUp();
+}else if(tier==='good'){
+state.combo++;
+var gain2=50+state.combo*5;
+state.score+=gain2;
+showFeedback('좋아요! +'+gain2,'var(--color-text-info)');
+sfxGood();
+maybeLevelUp();
+}else{
+state.combo=0;
+state.lives--;
+showFeedback('아쉬워요!','var(--color-text-danger)');
+pieceEl.style.animation='sdgShake .4s ease';
+sfxMiss();
+}
+updateHUD();
+setTimeout(function(){
+pieceEl.style.animation='';
+state.round++;
+if(state.lives<=0){endGame();}else{newRound();}
+},650);
+}
+function updateHUD(){
+$('sdg-score').textContent=state.score.toLocaleString();
+$('sdg-level').textContent=state.level;
+$('sdg-combo').textContent=state.combo;
+var hearts='';
+for(var i=0;i<3;i++){
+hearts+=heartIcon(i<state.lives);
+}
+$('sdg-lives').innerHTML=hearts;
+}
+function endGame(){
+state.gameOver=true;
+$('sdg-finalscore').textContent=state.score.toLocaleString();
+addScoreToLeaderboard(state.score);
+$('sdg-overlay').style.display='flex';
+}
+function resetGame(){
+state.score=0;state.combo=0;state.level=1;state.lives=3;state.speed=BASE_SPEED;state.gameOver=false;state.dir=1;state.pos=0;state.round=1;
+$('sdg-overlay').style.display='none';
+updateHUD();
+newRound();
+}
+loadLeaderboard();
+renderLeaderboard();
+measure();
+updateHUD();
+newRound();
+requestAnimationFrame(loop);
+window.addEventListener('resize',function(){measure();positionFrame();updatePiecePos();});
+$('sdg-dropbtn').addEventListener('click',dropPiece);
+$('sdg-stage').addEventListener('click',function(e){if(e.target.closest('#sdg-overlay'))return;dropPiece();});
+$('sdg-restart').addEventListener('click',resetGame);
+$('sdg-mute').addEventListener('click',function(){
+ensureAudio();
+muted=!muted;
+this.textContent=muted?'소리 켜기':'소리 끄기';
+if(sfxGain)sfxGain.gain.value=muted?0:0.5;
+if(bgmGain)bgmGain.gain.value=muted?0:0.05;
+});
+document.addEventListener('keydown',function(e){
+if(e.code==='Space'||e.key===' '||e.key==='Spacebar'){
+e.preventDefault();
+dropPiece();
+}
+});
+})();
+</script>
